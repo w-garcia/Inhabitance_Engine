@@ -1,5 +1,7 @@
 # import the necessary packages
-from __future__ import print_function
+from picamera.array import PiRGBArray
+from picamera import PiCamera
+#from __future__ import print_function
 from imutils.object_detection import non_max_suppression
 from time import sleep
 from imutils import paths
@@ -9,16 +11,14 @@ import imutils
 import cv2
 from datetime import datetime
 
-def beginVideoProcess():
+def beginVideoProcess(im):
     # load the image and resize it to (1) reduce detection time
     # and (2) improve detection accuracy
-
-    retval, im = video_capture.read()
     image = im.copy()
     orig = image.copy()
 
     #image = cv2.imread(imagePath)
-    image = imutils.resize(image, width=min(900, image.shape[1]))
+    image = imutils.resize(image, width=min(400, image.shape[1]))
 
     # detect people in the image
     (rects, weights) = hog.detectMultiScale(image, winStride=(4, 4),
@@ -55,15 +55,29 @@ args = vars(ap.parse_args())
 hog = cv2.HOGDescriptor()
 hog.setSVMDetector(cv2.HOGDescriptor_getDefaultPeopleDetector())
 
-video_capture = cv2.VideoCapture(0)
+#video_capture = cv2.VideoCapture(1)
+camera = PiCamera()
+rawCapture = PiRGBArray(camera)
+
 count = 0
 # loop over the image paths
 #for imagePath in paths.list_images(args["images"]):
 
-
-while(True):
-    rv, im_temp = video_capture.read()
-    cv2.imshow("Menu", im_temp)
+# capture frames from the camera
+for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=True):
+    # grab the raw NumPy array representing the image, then initialize the timestamp
+    # and occupied/unoccupied text
+    im_temp = frame.array
+    
+    # show the frame
+    if im_temp == None:
+        print('Got blank picture. Try a different hardware port')
+        break
+    im_temp = imutils.resize(im_temp, width=min(400, im_temp.shape[1]))
+    cv2.imshow("Menu", im_temp) 
+ 
+    # clear the stream in preparation for the next frame
+    rawCapture.truncate(0)
 
     if cv2.waitKey(5) & 0xFF == ord('q'):
         break
@@ -71,11 +85,10 @@ while(True):
         print("Starting")
         for i in range(0, 10):
             sleep(1)
-            count += beginVideoProcess()
-            print("[STATUS] Finished one process, found {}".format(count))
+            count += beginVideoProcess(im_temp)
         print("[UPDATE]: {}: Average of 10 processes: {}".format(datetime.now(), count/10))
 
 
-video_capture.release()
+#video_capture.release()
 cv2.destroyAllWindows()
 
